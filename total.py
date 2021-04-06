@@ -53,8 +53,10 @@ class check_source:
                     self.compression_method()
                 elif extra1 or extra2:
                     self.result.append("Unknown(only one flag)")  # github download
+                    self.result.append("Unknown")
                 else:
-                    break
+                    self.result.append("Unknown")
+                    self.result.append("Unknown")
                 return self.result
 
         for file_name in self.LFH.keys():
@@ -64,6 +66,7 @@ class check_source:
                 self.compression_method()
             elif extra1 or extra2:
                 self.result.append("Unknown(only one flag)")  # github download
+                self.result.append("Unknown")
             else:
                 break
             return self.result
@@ -98,8 +101,10 @@ class check_source:
                 extra2_start_offset = 4 + extra1_size
 
         if is_data_descriptor and mouse:
+            self.result.append("Unknown")
             self.result.append("mouse")
         elif not(is_data_descriptor) and terminal:
+            self.result.append("Unknown")
             self.result.append("terminal")
         else:
             self.result.append("Unknown")
@@ -111,19 +116,22 @@ class check_source:
             elif file.encoding_method == 'utf-8':
                 #self.result.append("Windows English or Windows Korean - Alzip")
                 self.result.append("Windows")
+                self.result.append("English")
                 self.korean_file = file.filename
-                self.check_program_1(file.filename)
+                self.check_program_1(file)
                 return
-            elif file.encoding_method == 'EUC-KR' or 'ISO-8859-1':  # cp949
+            elif file.encoding_method == 'EUC-KR':# or 'ISO-8859-1':  # cp949
                 #self.result.append("Windows Korean")
                 self.result.append("Windows")
+                self.result.append("Korean")
                 self.korean_file = file.filename
                 self.check_program_2(file, file.filename)
                 return
 
         # 한글 파일명 없음
         self.result.append("Windows")
-        self.check_program_3()  # 윈도우 영어 버전인지 한글 버전인지 구분 불가
+        self.result.append("Unknown")  # 한글 파일이 없기 때문에 윈도우 영어 버전인지 한글 버전인지 구분 불가
+        self.check_program_3()  # 한글 파일이 없기 때문에 윈도우 영어 버전인지 한글 버전인지 구분 불가
 
     def check_local_extra_field(self, filename, flag=None):
         data_len = 0
@@ -170,8 +178,8 @@ class check_source:
                     else:
                         n_structures = False  # True, False
                     return is_zip_file, n_structures
-            else:
-                return is_zip_file, n_structures  # False, False
+
+        return is_zip_file, n_structures  # False, False
 
     def check_empty_folder(self, folder_name):
         count = 0
@@ -185,25 +193,25 @@ class check_source:
         elif count == 1:
             return True  # 빈폴더
 
-    def check_program_1(self, filename):  # E [alzip, bandizip, 7-zip, WINRAR, WINZIP], K [alzip]
+    def check_program_1(self, file):  # E [alzip, bandizip, 7-zip, WINRAR, WINZIP], K [alzip]
         is_folder = False
         is_folder_header = False
         is_empty_folder = False
 
-        if self.check_local_extra_field(filename):
-            self.result.append("E [bandizip]")  # E [bandizip]
+        if self.check_local_extra_field(file.filename):
+            self.result.append("Local_Extra, [bandizip]")  # E [bandizip]
             return
-        else:
+        elif self.check_central_extra_field(file):
             for file in self.filelist:
                 if '/' in file.filename:  # 폴더가 존재
-                    is_folder = True
-                    if file.filename.split('/')[-1] == '':  # 폴더 헤더 존재
-                        is_folder_header = True
                     is_empty_folder = self.check_empty_folder(file.filename)
                     if is_empty_folder:  # 빈폴더는 고려하지 않음
                         continue
-                    else:
-                        break
+                    else:  # 빈폴더가 아님
+                        is_folder = True
+                        if file.filename.split('/')[-1] == '':  # 폴더 헤더 존재
+                            is_folder_header = True
+
 
             if not(is_folder):  # 폴더가 존재하지 않음
                 self.check_program_1_2()
@@ -212,16 +220,16 @@ class check_source:
             if is_folder and is_folder_header:  # 폴더 헤더 존재
                 zip_file, n_structures = self.check_inner_zip_file()
                 if zip_file and n_structures:
-                    self.result.append("E [7-zip, WINRAR]")
+                    self.result.append("Central_Extra, Folder & Header, ZIP file & nStructure, [7-zip, WINRAR]")
                 elif zip_file and not(n_structures):
-                    self.result.append("E [7-zip, WINZIP]")
+                    self.result.append("Central_Extra, Folder & Header, ZIP file, [7-zip, WINZIP]")
                 elif not(zip_file) and not(n_structures):
-                    self.result.append("E [7-zip, WINRAR, WINZIP]")
+                    self.result.append("Central_Extra, Folder & Header, [7-zip, WINRAR, WINZIP]")
                 else:
                     self.result.append("Unknown")
 
             elif is_folder and not(is_folder_header): # 폴더는 있으나 헤더는 없음
-                self.result.append("E, K [alzip]")
+                self.result.append("Central_Extra, Folder, E, K [alzip]")
                 return
 
     def check_compression_order(self):
@@ -237,7 +245,7 @@ class check_source:
 
         return different_order
 
-    def check_program_1_2(self):
+    def check_program_1_2(self):  # 폴더가 존재하지 않음
         # 내부에 ZIP 존재 및 이중 구조 확인
         is_zip_file, n_structures = self.check_inner_zip_file()
 
@@ -245,17 +253,17 @@ class check_source:
         different_order = self.check_compression_order()
 
         if is_zip_file and n_structures and different_order:
-            self.result.append("E, K [alzip] + E [WINRAR]")
+            self.result.append("Central_Extra, ZIP file & nStructure, order, E, K [alzip], E [WINRAR]")
         elif is_zip_file and n_structures and not(different_order):
-            self.result.append("E [alzip, 7-zip, WINRAR]")
+            self.result.append("Central_Extra, ZIP file & nStructure, [alzip, 7-zip, WINRAR]")
         elif is_zip_file and not(n_structures) and different_order:
-            self.result.append("E, K [alzip]")
+            self.result.append("Central_Extra, ZIP file, order, E, K [alzip]")
         elif is_zip_file and not(n_structures) and not(different_order):
-            self.result.append("E, K [7-zip, WINZIP]")
+            self.result.append("Central_Extra, ZIP file, [alzip, 7-zip, WINZIP]")
         elif not(is_zip_file) and different_order:
-            self.result.append("E, K [alzip] + E [WINRAR]")
+            self.result.append("Central_Extra, order, E, K [alzip], E [WINRAR]")
         elif not(is_zip_file) and not(different_order):
-            self.result.append("E [7-zip, WINRAR, WINZIP]")
+            self.result.append("Central_Extra, [alzip, 7-zip, WINRAR, WINZIP]")
         else:
             self.result.append("Unknown")
 
@@ -295,17 +303,17 @@ class check_source:
             if rtn == None:
                 pass
             elif not(rtn):
-                self.result.append("K [WINZIP]")
+                self.result.append("Local_Extra, Central_Extra_order, [WINZIP]")
                 return
             else:
                 is_zip_file, n_structures = self.check_inner_zip_file()
 
                 if is_zip_file and n_structures:
-                    self.result.append("K [WINRAR]")
+                    self.result.append("Local_Extra, ZIP file & nStructure, [WINRAR]")
                 elif is_zip_file and not(n_structures):
-                    self.result.append("K [bandizip]")
+                    self.result.append("Local_Extra, ZIP file, [bandizip]")
                 elif not(is_zip_file):
-                    self.result.append("K [bandizip, WINRAR]")
+                    self.result.append("Local_Extra, [bandizip, WINRAR]")
                 else:
                     self.result.append("Unknown")
 
@@ -313,12 +321,12 @@ class check_source:
             if file.extra_field_length > 0:
                 is_NTFS_extra_field = self.check_central_extra_field(file)
                 if is_NTFS_extra_field:
-                    self.result.append("K [7-zip]")
+                    self.result.append("Central_Extra, [7-zip]")
                 else:
                     self.result.append("Unknown")
                 return
             else:
-                self.result.append("K [Default]")
+                self.result.append("No_Central_Extra, [Default]")
                 return
 
     def check_program_3(self):
@@ -336,48 +344,48 @@ class check_source:
                 if is_NTFS_extra_field:
                     break
             else:
-                self.result.append("E, K [Default]")
+                self.result.append("No_Central_Extra, [Default]")
                 return
 
         for file in self.filelist:
             if '/' in file.filename:  # 폴더가 존재
-                is_folder = True
-                if file.filename.split('/')[-1] == '':  # 폴더 헤더 존재
-                    is_folder_header = True
                 is_empty_folder = self.check_empty_folder(file.filename)
                 if is_empty_folder:  # 빈폴더는 고려하지 않음
                     continue
                 else:
-                    break
+                    is_folder = True
+                    if file.filename.split('/')[-1] == '':  # 폴더 헤더 존재
+                        is_folder_header = True
+
 
         if is_NTFS_extra_field:
             if is_folder:
                 if not(is_folder_header):
-                    self.result.append("E, K [alzip]")
+                    self.result.append("Folder, E, K [alzip]")
                 elif is_zip_file and n_structures:
-                    self.result.append("E, K [7-zip, WINRAR]")
+                    self.result.append("Folder & Header, ZIP file & nStructure, [7-zip, WINRAR]")
                 elif is_zip_file and not(n_structures):
-                    self.result.append("E, K [bandizip, WINZIP]")
+                    self.result.append("Folder & Header, ZIP file, [bandizip, WINZIP]")
                 elif not(is_zip_file):
-                    self.result.append("E, K [bandizip, 7-zip, WINRAR, WINZIP]")
+                    self.result.append("Folder & Header, [bandizip, 7-zip, WINRAR, WINZIP]")
                 else:
                     self.result.append("Unknown")
             else:
                 if is_zip_file and n_structures and different_order:
-                    self.result.append("E, K [alzip] + E, K [WINRAR]")
+                    self.result.append("ZIP file & nStructure, order, E, K [alzip, WINRAR]")
                 elif is_zip_file and n_structures and not(different_order):
-                    self.result.append("E, K [alzip, 7-zip, WINRAR]")
+                    self.result.append("ZIP file & nStructure, [alzip, 7-zip, WINRAR]")
                 elif is_zip_file and not(n_structures) and different_order:
-                    self.result.append("E, K [alzip]")
+                    self.result.append("ZIP file, order [alzip]")
                 elif is_zip_file and not(n_structures) and not(different_order):
-                    self.result.append("E, K [bandizip, 7-zip, WINZIP]")
+                    self.result.append("ZIP file, [alzip, bandizip, 7-zip, WINZIP]")
                 elif not(is_zip_file):
-                    self.result.append("E, K [alzip, bandizip, 7-zip, WINRAR, WINZIP]")
+                    self.result.append("Central_Extra, [alzip, bandizip, 7-zip, WINRAR, WINZIP]")
                 else:
                     self.result.append("Unknown")
 
         elif not(is_NTFS_extra_field):
-            self.result.append("E, K [Default]")
+            self.result.append("No_Central_Extra, [Default]")
 
 if __name__ == "__main__":
     result = dict()
@@ -396,7 +404,6 @@ if __name__ == "__main__":
                     cs.created_env()
                     cs.stored_header()
                     result[full_path] = cs.operating_system()
-
 
     elif args.file:
         cs = check_source(args.file)
@@ -427,7 +434,7 @@ if __name__ == "__main__":
     import csv
     f = open('output.csv', 'w', encoding='utf8', newline='')
     wr = csv.writer(f)
-    wr.writerow(['Time', 'From', 'OS', 'method'])
+    wr.writerow(['Time', 'From', 'OS', 'Language', 'method'])
     for num, list in enumerate(result.values()):
         wr.writerow(list)
     f.close()
