@@ -71,8 +71,9 @@ class check_source:
                 break
             return self.result
 
-        #self.result.append("Windows")  # Windows
+        self.result.append("Windows")  # Windows
         self.is_korean_file()
+
         return self.result
 
     def compression_method(self):
@@ -115,21 +116,18 @@ class check_source:
                 pass # 영어 파일명
             elif file.encoding_method == 'utf-8':
                 #self.result.append("Windows English or Windows Korean - Alzip")
-                self.result.append("Windows")
                 self.result.append("English")
                 self.korean_file = file.filename
                 self.check_program_1(file)
                 return
-            elif file.encoding_method == 'EUC-KR':# or 'ISO-8859-1':  # cp949
+            elif file.encoding_method in ['EUC-KR','ISO-8859-1']:  # cp949
                 #self.result.append("Windows Korean")
-                self.result.append("Windows")
                 self.result.append("Korean")
                 self.korean_file = file.filename
                 self.check_program_2(file, file.filename)
                 return
 
         # 한글 파일명 없음
-        self.result.append("Windows")
         self.result.append("Unknown")  # 한글 파일이 없기 때문에 윈도우 영어 버전인지 한글 버전인지 구분 불가
         self.check_program_3()  # 한글 파일이 없기 때문에 윈도우 영어 버전인지 한글 버전인지 구분 불가
 
@@ -220,7 +218,7 @@ class check_source:
             if is_folder and is_folder_header:  # 폴더 헤더 존재
                 zip_file, n_structures = self.check_inner_zip_file()
                 if zip_file and n_structures:
-                    self.result.append("Central_Extra, Folder & Header, ZIP file & nStructure, [7-zip, WINRAR]")
+                    self.result.append("Central_Extra, Folder & Header, ZIP file & nStructure, [7-zip, WINRAR, WINZIP]")
                 elif zip_file and not(n_structures):
                     self.result.append("Central_Extra, Folder & Header, ZIP file, [7-zip, WINZIP]")
                 elif not(zip_file) and not(n_structures):
@@ -255,7 +253,7 @@ class check_source:
         if is_zip_file and n_structures and different_order:
             self.result.append("Central_Extra, ZIP file & nStructure, order, E, K [alzip], E [WINRAR]")
         elif is_zip_file and n_structures and not(different_order):
-            self.result.append("Central_Extra, ZIP file & nStructure, [alzip, 7-zip, WINRAR]")
+            self.result.append("Central_Extra, ZIP file & nStructure, [alzip, 7-zip, WINRAR, WINZIP]")
         elif is_zip_file and not(n_structures) and different_order:
             self.result.append("Central_Extra, ZIP file, order, E, K [alzip]")
         elif is_zip_file and not(n_structures) and not(different_order):
@@ -309,7 +307,7 @@ class check_source:
                 is_zip_file, n_structures = self.check_inner_zip_file()
 
                 if is_zip_file and n_structures:
-                    self.result.append("Local_Extra, ZIP file & nStructure, [WINRAR]")
+                    self.result.append("Local_Extra, ZIP file & nStructure, [bandizip, WINRAR]")
                 elif is_zip_file and not(n_structures):
                     self.result.append("Local_Extra, ZIP file, [bandizip]")
                 elif not(is_zip_file):
@@ -361,24 +359,24 @@ class check_source:
         if is_NTFS_extra_field:
             if is_folder:
                 if not(is_folder_header):
-                    self.result.append("Folder, E, K [alzip]")
+                    self.result.append("Central header, Folder, E, K [alzip]")
                 elif is_zip_file and n_structures:
-                    self.result.append("Folder & Header, ZIP file & nStructure, [7-zip, WINRAR]")
+                    self.result.append("Central header, Folder & Header, ZIP file & nStructure, [bandizip, 7-zip, WINRAR, WINZIP]")
                 elif is_zip_file and not(n_structures):
-                    self.result.append("Folder & Header, ZIP file, [bandizip, WINZIP]")
+                    self.result.append("Central header, Folder & Header, ZIP file, [bandizip, 7-zip, WINZIP]")
                 elif not(is_zip_file):
-                    self.result.append("Folder & Header, [bandizip, 7-zip, WINRAR, WINZIP]")
+                    self.result.append("Central header, Folder & Header, [bandizip, 7-zip, WINRAR, WINZIP]")
                 else:
                     self.result.append("Unknown")
             else:
                 if is_zip_file and n_structures and different_order:
-                    self.result.append("ZIP file & nStructure, order, E, K [alzip, WINRAR]")
+                    self.result.append("Central header, ZIP file & nStructure, order, E, K [alzip, WINRAR]")
                 elif is_zip_file and n_structures and not(different_order):
-                    self.result.append("ZIP file & nStructure, [alzip, 7-zip, WINRAR]")
+                    self.result.append("Central header, ZIP file & nStructure, [alzip, bandizip, 7-zip, WINRAR, WINZIP]")
                 elif is_zip_file and not(n_structures) and different_order:
-                    self.result.append("ZIP file, order [alzip]")
+                    self.result.append("Central header, ZIP file, order [alzip]")
                 elif is_zip_file and not(n_structures) and not(different_order):
-                    self.result.append("ZIP file, [alzip, bandizip, 7-zip, WINZIP]")
+                    self.result.append("Central header, ZIP file, [alzip, bandizip, 7-zip, WINZIP]")
                 elif not(is_zip_file):
                     self.result.append("Central_Extra, [alzip, bandizip, 7-zip, WINRAR, WINZIP]")
                 else:
