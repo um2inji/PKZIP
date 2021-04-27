@@ -146,10 +146,24 @@ class rtn_program:
         self.program['windows_alzip'].append(["N/A", 'no_korean_file', '0x0A00', '.0000000', '.0000000', 'UTF8', 'double_zipping', 'folder_without_header', 'different_order'])
         self.program['windows_alzip'].append(["N/A", 'no_korean_file', '0x0A00', 'UTF8', 'double_zipping', 'folder_without_header', 'alphabetical_order'])
 
-        self.program['macOS_zip'].append([['5554', '7578'], 'no_os_folder', 'no_data_descriptor', '0x0500'])
-        self.program['macOS_compress'].append([['5554', '7578'], '__MACOSX', 'data_descriptor', '0x0D00'])
-        self.program['linux_zip'].append([['5554', '7578'], 'no_os_folder', 'no_data_descriptor', '0x0500'])
-        self.program['linux_compress'].append([['5554', '7578'], 'no_os_folder', 'data_descriptor', '0x0D00'])
+        self.program['macOS_zip'].append([['5554', '7578'], '0x0500', (501, 20), 'no_double_zipping', 'N/A', 'N/A'])
+        self.program['macOS_zip'].append([['5554', '7578'], '0x0500', (501, 20), 'N/A', 'N/A', 'N/A'])
+        self.program['macOS_compress'].append([['5554', '7578'], '0x0D00', (501, 20), 'double_zipping', '__MACOSX', 'data_descriptor'])
+        self.program['macOS_compress'].append([['5554', '7578'], '0x0D00', (501, 20), 'N/A', '__MACOSX', 'data_descriptor'])
+        self.program['macOS_zip'].append([['5554', '7578'], '0x0500', 'N/A', 'no_double_zipping', 'N/A', 'N/A'])
+        self.program['macOS_zip'].append([['5554', '7578'], '0x0500', 'N/A', 'N/A', 'N/A', 'N/A'])
+        self.program['macOS_compress'].append([['5554', '7578'], '0x0D00', 'N/A', 'double_zipping', '__MACOSX', 'data_descriptor'])
+        self.program['macOS_compress'].append([['5554', '7578'], '0x0D00', 'N/A', 'N/A', '__MACOSX', 'data_descriptor'])
+
+        self.program['linux_zip'].append([['5554', '7578'], '0x0500', (1000, 1000), 'no_double_zipping', 'N/A', 'N/A'])
+        self.program['linux_zip'].append([['5554', '7578'], '0x0500', (1000, 1000), 'N/A', 'N/A', 'N/A'])
+        self.program['linux_compress'].append([['5554', '7578'], '0x0D00', (1000, 1000), 'double_zipping', 'N/A', 'data_descriptor'])
+        self.program['linux_compress'].append([['5554', '7578'], '0x0D00', (1000, 1000), 'N/A', 'N/A', 'data_descriptor'])
+
+        self.program['linux_zip'].append([['5554', '7578'], '0x0500', 'N/A', 'no_double_zipping', 'N/A', 'N/A'])
+        self.program['linux_zip'].append([['5554', '7578'], '0x0500', 'N/A', 'N/A', 'N/A', 'N/A'])
+        self.program['linux_compress'].append([['5554', '7578'], '0x0D00', 'N/A', 'double_zipping', 'N/A', 'data_descriptor'])
+        self.program['linux_compress'].append([['5554', '7578'], '0x0D00', 'N/A', 'N/A', 'N/A', 'data_descriptor'])
 
     def rtn_(self, analysis):
         candidate = list()
