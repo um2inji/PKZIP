@@ -38,11 +38,11 @@ class check_source:
     def is_korean_file(self):
         for file in self.filelist:
             if file.encoding_method == 'ascii':
-                pass # 영어 파일명
+                pass
             elif file.encoding_method == 'utf-8':
                 self.korean_file = file
                 return 'UTF8'
-            elif file.encoding_method in ['EUC-KR', 'ISO-8859-1']:  # cp949
+            elif file.encoding_method in ['EUC-KR', 'ISO-8859-1']:
                 self.korean_file = file
                 return 'CP949'
         return 'UTF8'  # no korean file
@@ -108,11 +108,11 @@ class check_source:
 
     def check_inner_zip_file(self):
         for file in self.filelist:
-            if '.zip' in file.filename:  # ZIP 존재
+            if '.zip' in file.filename:
                 with open(self.path, 'rb') as zf:
                     zf_data = zf.read()
                     match = re.findall(b'\x50\x4B\x05\x06', zf_data)
-                    if len(match) > 1:  # ZIP 이중 구조 존재
+                    if len(match) > 1:
                         return 'no_double_zipping'
                     else:
                         return 'double_zipping'
