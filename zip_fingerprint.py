@@ -1,23 +1,19 @@
-from custom_zipfile import ZipFile, BadZipFile
+from custom_zipfile import ZipFile
 import os
-import chardet # pip install
 import re
 import argparse
-from pyads import ADS
 from datetime import datetime, timedelta
 from file_list import rtn_program
 import csv
-
 
 class check_source:
     def __init__(self, path):
         self.path = path
         self.LFH = dict()
-        self.detector = chardet.UniversalDetector()
         self.zip = ZipFile(self.path)
         self.filelist = ZipFile.infolist(self.zip)
         self.result = list()
-        self.korean_file = ''
+        self.korean_file = ""
 
     def stored_header(self):
         for file in self.filelist:
@@ -27,31 +23,53 @@ class check_source:
     def Local_Header(self, file):
         self.LFH[file["filename"]] = file
 
+    def check_creating_system(self):
+        creating_system = list()
+        for file in self.filelist:
+            creating_system.append(file.create_system)
+
+        creating_system = list(set(creating_system))
+
+        if len(creating_system) == 1:
+            return creating_system[0]
+        else:
+            return 'N/A'
+
     def is_korean_file(self):
         for file in self.filelist:
             if file.encoding_method == 'ascii':
                 pass # 영어 파일명
             elif file.encoding_method == 'utf-8':
                 self.korean_file = file
-                print('??', file.filename)
                 return 'UTF8'
             elif file.encoding_method in ['EUC-KR', 'ISO-8859-1']:  # cp949
                 self.korean_file = file
                 return 'CP949'
         return 'UTF8'  # no korean file
 
-    def check_local_extra_field(self):
+    def check_local_extra_field(self, uid=False):
         id_list = list()
         for file in self.filelist:
             data_len = 0
             extra2_start_offset = 0
 
-            while self.LFH[file.filename]['extra_field_length'] * 2 > data_len:
-                big_endian = '%s%s' % (self.LFH[file.filename]['extra'][extra2_start_offset + 3 * 2: extra2_start_offset + 4 * 2], self.LFH[file.filename]['extra'][extra2_start_offset + 2 * 2: extra2_start_offset + 3 * 2])
-                extra1_size = int(big_endian, 16)
-                data_len += (4 * 2 + extra1_size * 2)
-                id_list.append(self.LFH[file.filename]['extra'][extra2_start_offset:extra2_start_offset + 2 * 2])
-                extra2_start_offset = data_len
+            if not(uid):
+                while self.LFH[file.filename]['extra_field_length'] * 2 > data_len:
+                    big_endian = '%s%s' % (self.LFH[file.filename]['extra'][extra2_start_offset + 3 * 2: extra2_start_offset + 4 * 2], self.LFH[file.filename]['extra'][extra2_start_offset + 2 * 2: extra2_start_offset + 3 * 2])
+                    extra1_size = int(big_endian, 16)
+                    data_len += (4 * 2 + extra1_size * 2)
+                    id_list.append(self.LFH[file.filename]['extra'][extra2_start_offset:extra2_start_offset + 2 * 2])
+                    extra2_start_offset = data_len
+            else:
+                while self.LFH[file.filename]['extra_field_length'] * 2 > data_len:
+                    big_endian = '%s%s' % (self.LFH[file.filename]['extra'][extra2_start_offset + 3 * 2: extra2_start_offset + 4 * 2], self.LFH[file.filename]['extra'][extra2_start_offset + 2 * 2: extra2_start_offset + 3 * 2])
+                    extra1_size = int(big_endian, 16)
+                    data_len += (4 * 2 + extra1_size * 2)
+                    if self.LFH[file.filename]['extra'][extra2_start_offset:extra2_start_offset + 2 * 2] == '5558':
+                        uid_big = '%s%s' % (self.LFH[file.filename]['extra'][extra2_start_offset + 13 * 2: extra2_start_offset + 14 * 2], self.LFH[file.filename]['extra'][extra2_start_offset + 12 * 2: extra2_start_offset + 13 * 2])
+                        gid_big = '%s%s' % (self.LFH[file.filename]['extra'][extra2_start_offset + 15 * 2: extra2_start_offset + 16 * 2], self.LFH[file.filename]['extra'][extra2_start_offset + 14 * 2: extra2_start_offset + 15 * 2])
+                    extra2_start_offset = data_len
+                return int(uid_big, 16), int(gid_big,16)
 
         if len(id_list) == 1:
             return id_list[0]
@@ -109,18 +127,18 @@ class check_source:
                 count += 1
 
         if count > 1:
-            return False  # 빈폴더 아님
+            return False
         elif count == 1:
-            return True  # 빈폴더
+            return True
 
     def check_header_of_folder(self):
         for file in self.filelist:
-            if '/' in file.filename:  # 폴더가 존재
+            if '/' in file.filename:
                 is_empty_folder = self.check_empty_folder(file.filename)
-                if is_empty_folder:  # 빈폴더는 고려하지 않음
+                if is_empty_folder:
                     continue
                 else:
-                    if file.filename.split('/')[-1] == '':  # 폴더 헤더 존재
+                    if file.filename.split('/')[-1] == '':
                         return "folder_with_header"
                     else:
                         return "folder_without_header"
@@ -131,7 +149,8 @@ class check_source:
         temp_filelist = list()
 
         for file in self.filelist:
-            temp_filelist.append(file.filename.lower())
+            if '__macosx/' not in file.filename.lower():
+                temp_filelist.append(file.filename.lower())
 
         if sorted(temp_filelist) == temp_filelist:
             pass
@@ -142,6 +161,7 @@ class check_source:
 
     def check_time_nanoseconds(self):
         time_list = list()
+        exist_time_extra = False
         for file in self.filelist:
             data_len = 0
             extra2_start_offset = 0
@@ -149,6 +169,7 @@ class check_source:
                 extra1_size = int.from_bytes(file.extra[extra2_start_offset + 2: extra2_start_offset + 4], 'little')
                 data_len += (4 + extra1_size)
                 if file.extra[extra2_start_offset:extra2_start_offset + 2] == b'\x0A\x00':
+                    exist_time_extra = True
                     time_length = extra2_start_offset + 10
                     time_start_offset = time_length + 2
 
@@ -157,7 +178,11 @@ class check_source:
                         temp_time = int.from_bytes(file.extra[time_start_offset + (i*8) :time_start_offset + ((i+1)*8)], byteorder='little')
                         nanoseconds = (datetime(1601, 1, 1) + timedelta(microseconds=temp_time / 10)).strftime("%f")
                         time_list.append(nanoseconds)
+
                 extra2_start_offset = data_len  # 4 + extra1_size
+
+        if not(exist_time_extra):
+            return "N/A"
 
         count_dict = dict()
         count_dict["all"] = 0
@@ -189,14 +214,16 @@ class check_source:
                 extra1_size = int.from_bytes(file.extra[extra2_start_offset + 2: extra2_start_offset + 4], 'little')
                 data_len += (4 + extra1_size)
                 if file.extra[extra2_start_offset:extra2_start_offset + 2] == b'\x75\x78':
-                    uid.append(int.from_bytes(file.extra[extra2_start_offset+6:extra2_start_offset+10], byteorder='little'))
-                    gid.append(int.from_bytes(file.extra[extra2_start_offset+11:extra2_start_offset+15], byteorder='little'))
+                    uid_len = int.from_bytes(file.extra[extra2_start_offset+5:extra2_start_offset + 6], byteorder='little')
+                    uid.append(int.from_bytes(file.extra[extra2_start_offset+6:extra2_start_offset+6+uid_len], byteorder='little'))
+                    gid_len = int.from_bytes(file.extra[extra2_start_offset+6+uid_len:extra2_start_offset +6+uid_len+1], byteorder='little')
+                    gid.append(int.from_bytes(file.extra[extra2_start_offset+6+uid_len+1:extra2_start_offset+6+uid_len+1+gid_len], byteorder='little'))
 
                 extra2_start_offset = data_len
         uid = list(set(uid))
         gid = list(set(gid))
 
-        if len(uid) == 1 and len(gid) == 1:
+        if (len(uid) == 1 and len(gid) == 1) and (uid[0] in [1000, 501]) and (gid[0] in [1000, 20]):
             return uid[0], gid[0]
         else:
             return "N/A"
@@ -209,9 +236,8 @@ class check_source:
         return 'N/A'
 
     def check_data_descriptor(self):
-        # 마우스 우 클릭 압축 시, 데이터 디스크립터 생성
         file_count = 0
-        for file in self.filelist:  # 폴더를 제외한 파일의 개수
+        for file in self.filelist:
             if '/' in file.filename:
                 if file.filename.split('/')[-1] != '':
                     file_count += 1
@@ -228,7 +254,6 @@ class check_source:
         return "N/A"
 
     def length_of_extra_field(self):
-        # 마우스 우 클릭 압축 시, UT 길이 : 0x0D(central)
         data_len = 0
         extra2_start_offset = 0
 
@@ -249,30 +274,45 @@ class check_source:
         result['reason'] = list()
 
         local_extra_id = self.check_local_extra_field()
-        result['reason'].append(local_extra_id)  # local_extra_field_id = ['5554', '7578'], ['7570'], []
-        if local_extra_id == '7570' or local_extra_id == 'N/A':
+        result['reason'].append(local_extra_id)
+        creating_sys = self.check_creating_system()
+        result['reason'].append(creating_sys)
+        if local_extra_id == '7570' or local_extra_id == 'N/A' and creating_sys == 0:
             encoding_method = self.is_korean_file()
             if self.korean_file:
                 result['reason'].append("korean_file")
             else:
                 result['reason'].append("no_korean_file")
-            result['reason'].append(self.check_central_extra_field()) # central_extra_field_id = '0X0A00+0x7075', '0x7075+0x0A00', '0x0A00', 'none
-            result['reason'].append(self.check_time_nanoseconds())  # 'no_nanoseconds', 'part_nanoseconds', 'nanoseconds'
-            result['reason'].append(encoding_method)  # encoding_method = 'UTF', 'CP'
-            result['reason'].append(self.check_header_of_folder())  # folder_info = 'folder_without_header', 'folder_with_header', 'no_folder'
-            result['reason'].append(self.check_inner_zip_file()) # double_zipping = ['zip', 'n_structures'], ['zip'], ['no_double_zip']
-            order_rtn = self.check_compression_order()  # True, False
-            if not(order_rtn): result['reason'].append('alphabetical_order') #order = 'ascii_order'
-            else: result['reason'].append('different_order') #order = 'different_order'
+            result['reason'].append(self.check_central_extra_field())
+            result['reason'].append(self.check_time_nanoseconds())
+            result['reason'].append(encoding_method)
+            result['reason'].append(self.check_header_of_folder())
+            result['reason'].append(self.check_inner_zip_file())
+            order_rtn = self.check_compression_order()
+            if not(order_rtn): result['reason'].append('alphabetical_order')
+            else: result['reason'].append('different_order')
+
+        elif local_extra_id == 'N/A' and creating_sys == 3:  # macOS_winzip
+            result['reason'].append(self.check_header_of_folder())
+            result['reason'].append(self.check_inner_zip_file())
+            order_rtn = self.check_compression_order()
+            if not (order_rtn): result['reason'].append('alphabetical_order')
+            else: result['reason'].append('different_order')
 
         elif local_extra_id == ['5554', '7578']:
-            result['reason'].append(self.length_of_extra_field())  # 0x0D00, 0x0500
+            result['reason'].append(self.length_of_extra_field())
             result['reason'].append(self.check_uid())
             result['reason'].append(self.check_inner_zip_file())
-            result['reason'].append(self.check_os_folder())  #  __MACOSX, 'no_os_folder'
-            result['reason'].append(self.check_data_descriptor())  # data_desciptor, no_data_descriptor
+            result['reason'].append(self.check_os_folder())
+            result['reason'].append(self.check_data_descriptor())
 
-
+        elif local_extra_id == ['5558']:
+            result['reason'].append(self.check_local_extra_field(uid=True))
+            result['reason'].append(self.check_header_of_folder())
+            result['reason'].append(self.check_inner_zip_file())
+            order_rtn = self.check_compression_order()
+            if not(order_rtn): result['reason'].append('alphabetical_order')
+            else: result['reason'].append('different_order')
         else:
             result['program'] = ['N/A']
             return result
@@ -280,7 +320,7 @@ class check_source:
         a = rtn_program()
         a.program_list()
         result["program"] = a.rtn_(result['reason'])
-        print(result)
+
         return result
 
 def write_cvs(result, win_wr, unix_wr):
@@ -305,12 +345,6 @@ if __name__ == "__main__":
     parser.add_argument("-v", dest="volume", action="store", type=str)
     args = parser.parse_args()
 
-    win_f = open('windows_output.csv', 'w', encoding='utf8', newline='')
-    unix_f = open('unix_output.csv', 'w', encoding='utf8', newline='')
-    win_wr = csv.writer(win_f)
-    unix_wr = csv.writer(unix_f)
-    win_wr.writerow(['local_extra', 'korean_file', 'central_extra', 'seconds', 'encoding', 'folder', 'double_zip', 'order', 'program'])
-    unix_wr.writerow(['local_extra', 'length_extra_field', 'double_zip', 'os_folder', 'data_descriptor',  'program'])
     if args.dir:
         for root, _, files in os.walk(args.dir):
             if 'set9' in root or 'set2' in root or 'set4' in root or 'paper' in root:
@@ -319,61 +353,25 @@ if __name__ == "__main__":
                 for file in files:
                     if file.split('.')[-1].lower() == 'zip':
                         full_path = os.path.join(root, file)
-                        print(file)
                         cs = check_source(full_path)
                         cs.stored_header()
-                        result = cs.presume_program()
-                        write_cvs(result, win_wr, unix_wr)
+                        result[file] = cs.presume_program()
 
     elif args.file:
         cs = check_source(args.file)
         cs.stored_header()
-        result = cs.presume_program()
-        write_cvs(result, win_wr, unix_wr)
+        result[args.file] = cs.presume_program()
 
     elif args.volume:
         for root, _, files in os.walk(args.volume):
             if 'OneDrive - 고려대학교' in root or 'AppData' in root:
                 continue
-            else:
+            if 'Desktop' in root or 'Documents' in root or 'Downloads' in root:
                 for file in files:
                     if file.split('.')[-1].lower() == 'zip':
-                        try:
-                            full_path = os.path.join(root, file)
-                            cs = check_source(full_path)
-                            cs.stored_header()
-                            result = cs.presume_program()
-                            write_cvs(result, win_wr, unix_wr)
-                        except:
-                            pass
+                        full_path = os.path.join(root, file)
+                        cs = check_source(full_path)
+                        cs.stored_header()
+                        result[file] = cs.presume_program()
 
-    win_f.close()
-    unix_f.close()
-    t = ''
-    d = dict()
-    f = open('windows_output.csv', 'r', encoding='utf-8')
-    rdr = csv.reader(f)
-    for line in rdr:
-        t = ''
-        for i in line:
-            t += i
-        try:
-            d[t] += 1
-        except:
-            d[t] = 1
-    for k, v in d.items():
-        print(k, v)
-    f.close()
-    f = open('unix_output.csv', 'r', encoding='utf-8')
-    rdr = csv.reader(f)
-    for line in rdr:
-        t = ''
-        for i in line:
-            t += i
-        try:
-            d[t] += 1
-        except:
-            d[t] = 1
-    for k, v in d.items():
-        print(k, v)
-    f.close()
+    print(result)
