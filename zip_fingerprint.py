@@ -347,10 +347,7 @@ if __name__ == "__main__":
 
     if args.dir:
         for root, _, files in os.walk(args.dir):
-            if 'set9' in root or 'set2' in root or 'set4' in root or 'paper' in root:
-                continue
-            else:
-                for file in files:
+            for file in files:
                     if file.split('.')[-1].lower() == 'zip':
                         full_path = os.path.join(root, file)
                         cs = check_source(full_path)
@@ -364,14 +361,11 @@ if __name__ == "__main__":
 
     elif args.volume:
         for root, _, files in os.walk(args.volume):
-            if 'OneDrive - 고려대학교' in root or 'AppData' in root:
-                continue
-            if 'Desktop' in root or 'Documents' in root or 'Downloads' in root:
-                for file in files:
-                    if file.split('.')[-1].lower() == 'zip':
-                        full_path = os.path.join(root, file)
-                        cs = check_source(full_path)
-                        cs.stored_header()
-                        result[file] = cs.presume_program()
+            for file in files:
+                if file.split('.')[-1].lower() == 'zip':
+                    full_path = os.path.join(root, file)
+                    cs = check_source(full_path)
+                    cs.stored_header()
+                    result[file] = cs.presume_program()
 
     print(result)
